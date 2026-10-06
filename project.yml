@@ -1,0 +1,12 @@
+name: VibePlayer
+options:
+  bundleIdPrefix: com.vibe
+targets:
+  VibePlayer:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - AppCode.swift
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
