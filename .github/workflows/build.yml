@@ -1,0 +1,43 @@
+name: Compile iPad App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Project Generator
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build App for Sideloading
+        run: |
+          xcodebuild clean build \
+            -project VibePlayer.xcodeproj \
+            -scheme VibePlayer \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ./build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package into .ipa
+        run: |
+          mkdir -p Payload
+          mv build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qq -r VibePlayer.ipa Payload
+
+      - name: Upload Finished App
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibePlayer-iOS-Build
+          path: VibePlayer.ipa
