@@ -5,7 +5,7 @@ targets:
   VibePlayer:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "27.0"
     sources:
       - AppCode.swift
     settings:
