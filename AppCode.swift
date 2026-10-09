@@ -23,7 +23,6 @@ class AddonStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([String].self, from: data) {
             savedManifests = decoded
         } else {
-            // Default addon included
             savedManifests = ["https://v3-cinemeta.strem.io/manifest.json"]
         }
     }
@@ -152,7 +151,7 @@ struct LocalPlayerView: View {
     }
 }
 
-// MARK: - Tab 2: Addon Manager (With Save Feature)
+// MARK: - Tab 2: Addon Manager
 struct AddonsManagerView: View {
     @EnvironmentObject var addonStore: AddonStore
     @State private var newManifestURL = ""
@@ -193,7 +192,7 @@ struct AddonsManagerView: View {
     }
 }
 
-// MARK: - Addon Detail (Fetches Manifest)
+// MARK: - Addon Detail
 struct AddonDetailView: View {
     let manifestURL: String
     
@@ -250,7 +249,7 @@ struct AddonDetailView: View {
     }
 }
 
-// MARK: - Catalog Grid (With Search Capability)
+// MARK: - Catalog Grid (With Search)
 struct CatalogGridView: View {
     let manifestURL: String
     let catalog: AddonCatalog
@@ -303,7 +302,6 @@ struct CatalogGridView: View {
             Task { await fetchCatalog() }
         }
         .onChange(of: searchText) { newValue in
-            // Reload default catalog if search is cleared
             if newValue.isEmpty { Task { await fetchCatalog() } }
         }
         .task { await fetchCatalog() }
@@ -314,7 +312,6 @@ struct CatalogGridView: View {
         errorMessage = nil
         let baseURL = manifestURL.replacingOccurrences(of: "/manifest.json", with: "")
         
-        // Handle Search URL vs Standard URL
         var catalogURLString = ""
         if !searchText.isEmpty, let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             catalogURLString = "\(baseURL)/catalog/\(catalog.type)/\(catalog.id)/search=\(encodedQuery).json"
@@ -387,7 +384,6 @@ struct StreamSelectionView: View {
             get: { selectedStreamURL.map { IdentifiableURL(url: $0) } },
             set: { selectedStreamURL = $0?.url }
         )) { identURL in
-            // Pass the current URL and all valid streams so the user can change quality
             NativeStreamPlayerView(
                 currentURL: identURL.url,
                 availableStreams: streams.filter { $0.url != nil }
@@ -419,7 +415,7 @@ struct IdentifiableURL: Identifiable {
     let url: URL
 }
 
-// MARK: - Video Player (With Quality/Stream Picker)
+// MARK: - Video Player (With Advanced Quality Selection)
 struct NativeStreamPlayerView: View {
     @State var currentURL: URL
     let availableStreams: [AddonStream]
@@ -428,7 +424,7 @@ struct NativeStreamPlayerView: View {
     @State private var player: AVPlayer?
     
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             Color.black.edgesIgnoringSafeArea(.all)
             
             if let player = player {
@@ -438,54 +434,72 @@ struct NativeStreamPlayerView: View {
                     .onDisappear { player.pause() }
             }
             
-            // Top Right Overlay Controls
-            HStack(spacing: 16) {
-                // Quality / Stream Picker Menu
-                if availableStreams.count > 1 {
-                    Menu {
+            // Top Controls Overlay
+            HStack {
+                Spacer()
+                
+                // Quality Selection Menu
+                Menu {
+                    Section("Switch Addon Link") {
                         ForEach(availableStreams) { stream in
                             if let urlString = stream.url, let url = URL(string: urlString) {
-                                Button(stream.title ?? stream.name ?? "Unknown Quality") {
-                                    changeStreamQuality(to: url)
+                                Button(stream.title ?? stream.name ?? "Standard Quality") {
+                                    changeStreamSource(to: url)
                                 }
                             }
                         }
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
                     }
+                    
+                    Section("Force HLS Resolution") {
+                        Button("Auto") { forceResolution(width: 0, height: 0) }
+                        Button("1080p") { forceResolution(width: 1920, height: 1080) }
+                        Button("720p") { forceResolution(width: 1280, height: 720) }
+                        Button("480p") { forceResolution(width: 854, height: 480) }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "slider.horizontal.3")
+                        Text("Quality")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.7))
+                    .clipShape(Capsule())
                 }
                 
                 // Close Button
                 Button(action: { dismiss() }) {
-                    Image(systemName: "xmark")
-                        .font(.title2)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title)
                         .foregroundColor(.white)
-                        .padding(10)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Circle())
+                        .padding(.leading, 8)
+                        .shadow(radius: 2)
                 }
             }
-            .padding()
+            .padding(.top, 20)
+            .padding(.trailing, 20)
         }
         .onAppear {
             self.player = AVPlayer(url: currentURL)
         }
     }
     
-    func changeStreamQuality(to newURL: URL) {
+    // Swaps to a completely different stream link from the addon
+    func changeStreamSource(to newURL: URL) {
         currentURL = newURL
         let currentTime = player?.currentTime() ?? .zero
-        
-        // Pause old, swap item, seek to same time, and resume
         player?.pause()
         let newItem = AVPlayerItem(url: newURL)
         player?.replaceCurrentItem(with: newItem)
         player?.seek(to: currentTime)
         player?.play()
+    }
+    
+    // Forces the current stream to drop or rise to a specific quality
+    func forceResolution(width: CGFloat, height: CGFloat) {
+        player?.currentItem?.preferredMaximumResolution = CGSize(width: width, height: height)
     }
 }
